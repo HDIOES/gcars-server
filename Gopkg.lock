@@ -2,6 +2,14 @@
 
 
 [[projects]]
+  digest = "1:695dbbcfe13b9c49619e1b31c27e2e3575b233d5d01924271ec4a20d9d0801c7"
+  name = "github.com/ByteArena/box2d"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "05f3eabc3755dd654f11a368cec066e0a3a0c3a8"
+  version = "v1.0.2"
+
+[[projects]]
   digest = "1:7b5c6e2eeaa9ae5907c391a91c132abfd5c9e8a784a341b5625e750c67e6825d"
   name = "github.com/gorilla/websocket"
   packages = ["."]
@@ -52,6 +60,7 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/ByteArena/box2d",
     "github.com/gorilla/websocket",
     "github.com/lib/pq",
     "github.com/rubenv/sql-migrate",

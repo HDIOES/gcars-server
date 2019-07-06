@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/HDIOES/gcars-server/game"
 	"github.com/HDIOES/gcars-server/util"
 	"github.com/gorilla/websocket"
 	_ "github.com/lib/pq"
@@ -54,6 +55,21 @@ func main() {
 			log.Panic(err)
 		}
 	}
+	var serverInstance = game.CreateServerInstance()
+	serverInstance.CreateSession()
+	http.HandleFunc("/receive", func(w http.ResponseWriter, r *http.Request) {
+		upgrader.CheckOrigin = func(r *http.Request) bool {
+			return true
+		}
+		conn, err := upgrader.Upgrade(w, r, nil)
+		serverInstance.Sessions[0].CreatePlayer(conn)
+		if err != nil {
+			conn.Close()
+			return
+		}
+		log.Println("Connection added")
+	})
+
 	log.Println("This server is running!")
 	if err := http.ListenAndServe(":"+strconv.Itoa(configuration.Port), nil); err != nil {
 		log.Panic(err)
