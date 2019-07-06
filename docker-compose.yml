@@ -13,15 +13,9 @@ services:
     volumes:
       - gcars_data:/var/lib/postgresql/data
     ports:
-      - 5432:5433
+      - 5435:5432
   app:
     build: .
-    environment:
-      POSTGRES_USER: gcars_user
-      POSTGRES_PASSWORD: 12345
-      POSTGRES_HOST: gcars_postgresdb
-      POSTGRES_PORT: 5432
-      POSTGRES_DATABASE: gcars
     ports:
       - 8087:8087
     depends_on:
