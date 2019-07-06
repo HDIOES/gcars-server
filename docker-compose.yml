@@ -1,0 +1,30 @@
+version: '3.6'
+
+volumes:
+  gcars_data:
+    driver: local
+services:
+  gcars_postgresdb:
+    image: postgres
+    environment:
+      POSTGRES_USER: gcars_user
+      POSTGRES_PASSWORD: 12345
+      POSTGRES_DB: gcars
+    volumes:
+      - gcars_data:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+  app:
+    build: .
+    environment:
+      POSTGRES_USER: gcars_user
+      POSTGRES_PASSWORD: 12345
+      POSTGRES_HOST: gcars_postgresdb
+      POSTGRES_PORT: 5432
+      POSTGRES_DATABASE: gcars
+    ports:
+      - 10046:10046
+    depends_on:
+      - gcars_postgresdb
+    links:
+      - gcars_postgresdb
