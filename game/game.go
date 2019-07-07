@@ -3,6 +3,7 @@ package game
 import (
 	"log"
 	"strings"
+	"time"
 
 	"github.com/ByteArena/box2d"
 	"github.com/gorilla/websocket"
@@ -16,15 +17,30 @@ type ServerInstance struct {
 
 //Player struct represents player data and player logic
 type Player struct {
-	ID         int64
-	connection *websocket.Conn
-	bodyDef    *box2d.B2BodyDef
-	body       *box2d.B2Body
-	shape      *box2d.B2PolygonShape
+	ID           int64
+	connection   *websocket.Conn
+	bodyDef      *box2d.B2BodyDef
+	body         *box2d.B2Body
+	shape        *box2d.B2PolygonShape
+	sentData     *SentData
+	receivedData *ReceivedData
+}
+
+//SentData struct represents sent data
+type SentData struct {
+	X float64
+	Y float64
+}
+
+//ReceivedData struct represents received data
+type ReceivedData struct {
 }
 
 func (player *Player) sendData() {
-
+	player.connection.WriteJSON(&SentData{
+		X: player.body.GetPosition().X,
+		Y: player.body.GetPosition().Y,
+	})
 }
 
 func (player *Player) receiveData() {
@@ -79,6 +95,7 @@ func (s *Session) StopSession() {
 func (s *Session) simulate() {
 	log.Println("Session started")
 	for strings.Compare(s.status, "active") == 0 {
+		time.Sleep(20 * time.Millisecond)
 		for _, player := range s.Players {
 			player.DoExchange()
 		}
