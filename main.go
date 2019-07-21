@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/HDIOES/gcars-server/game"
+	"github.com/HDIOES/gcars-server/core"
 	"github.com/HDIOES/gcars-server/util"
 	"github.com/gorilla/websocket"
 	_ "github.com/lib/pq"
@@ -55,14 +55,13 @@ func main() {
 			log.Panic(err)
 		}
 	}
-	var serverInstance = game.CreateServerInstance()
-	serverInstance.CreateSession()
+	session := core.Session{}
 	http.HandleFunc("/receive", func(w http.ResponseWriter, r *http.Request) {
 		upgrader.CheckOrigin = func(r *http.Request) bool {
 			return true
 		}
 		conn, err := upgrader.Upgrade(w, r, nil)
-		serverInstance.Sessions[0].CreatePlayer(conn)
+		session.AddCar(500, 500, conn)
 		if err != nil {
 			conn.Close()
 			return
