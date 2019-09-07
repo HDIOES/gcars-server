@@ -1,7 +1,3 @@
 {
-    "port": 8087,
-    "database_url": "postgres://gcars_user:12345@gcars_postgresdb:5432/gcars?sslmode=disable",
-    "maxOpenConnections": 20,
-    "maxIdleConnections": 5,
-    "connectionTimeout": 60
+    "port": 8087
 }
