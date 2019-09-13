@@ -2,14 +2,6 @@
 
 
 [[projects]]
-  digest = "1:695dbbcfe13b9c49619e1b31c27e2e3575b233d5d01924271ec4a20d9d0801c7"
-  name = "github.com/ByteArena/box2d"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "05f3eabc3755dd654f11a368cec066e0a3a0c3a8"
-  version = "v1.0.2"
-
-[[projects]]
   digest = "1:7b5c6e2eeaa9ae5907c391a91c132abfd5c9e8a784a341b5625e750c67e6825d"
   name = "github.com/gorilla/websocket"
   packages = ["."]
@@ -30,17 +22,6 @@
   version = "v1.1.1"
 
 [[projects]]
-  branch = "master"
-  digest = "1:83eb06141fc25c7fd89f8b39717962ac930a7480796aab3d46c7e88507a69173"
-  name = "github.com/rubenv/sql-migrate"
-  packages = [
-    ".",
-    "sqlparse",
-  ]
-  pruneopts = "UT"
-  revision = "f4d34eae5a5cf210693e81c604e6bac5f6727927"
-
-[[projects]]
   digest = "1:dc48dff981a895912c33cf272b1d869c216d058bd4025736cb481d3ceeed6872"
   name = "github.com/tkanos/gonfig"
   packages = ["."]
@@ -48,22 +29,12 @@
   revision = "e83209aed2d171bab5ffb312a1e630110481cb99"
   version = "1.0"
 
-[[projects]]
-  digest = "1:1b36b0cb56126316f637ad55cfd5ed84c945fe45bd90e944666b4107a80a1da9"
-  name = "gopkg.in/gorp.v1"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "6a667da9c028871f98598d85413e3fc4c6daa52e"
-  version = "v1.7.2"
-
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
-    "github.com/ByteArena/box2d",
     "github.com/gorilla/websocket",
     "github.com/lib/pq",
-    "github.com/rubenv/sql-migrate",
     "github.com/tkanos/gonfig",
   ]
   solver-name = "gps-cdcl"

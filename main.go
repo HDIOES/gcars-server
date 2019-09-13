@@ -30,7 +30,7 @@ func main() {
 			return true
 		}
 		conn, err := upgrader.Upgrade(w, r, nil)
-		session.AddCar(500, 500, conn)
+		session.AddCar(2000, 5000, conn)
 		if err != nil {
 			conn.Close()
 			return
