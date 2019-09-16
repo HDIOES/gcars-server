@@ -1,7 +1,6 @@
 package core
 
 import (
-	"fmt"
 	"math"
 	"strings"
 	"time"
@@ -17,11 +16,8 @@ type Session struct {
 
 //AddCar function
 func (s *Session) AddCar(x float64, y float64, conn *websocket.Conn) {
-	position := Vector{X: x, Y: y}
-	car := &Car{connection: conn}
-	car.SetPosition(position)
-	car.SetMass(60.0)
-	car.SetApplyingForce(Vector{X: 0, Y: -2})
+	car := &Car{}
+	car.Init(x, y, conn)
 	s.Cars = append(s.Cars, car)
 	if len(s.Cars) > 0 && s.status != "running" {
 		s.Run()
@@ -55,16 +51,61 @@ func (s *Session) Stop() {
 
 //Car struct
 type Car struct {
+	//linear parameters
 	position     Vector
-	angle        float64
 	velocity     Vector
 	acceleration Vector
-	p1           Vector
-	p2           Vector
-	p3           Vector
-	p4           Vector
-	mass         float64
-	connection   *websocket.Conn
+
+	//car parameters
+	engineForce      Vector
+	engineForceAngle float64
+	forcePoint       Vector
+
+	//angular parameters
+	angle               float64
+	angularVelocity     float64
+	angularAcceleration float64
+
+	//constant parameters
+	mass            float64
+	height          float64
+	width           float64
+	momentOfInertia float64
+
+	//tech parameters
+	connection *websocket.Conn
+}
+
+//Init function
+func (c *Car) Init(x float64, y float64, conn *websocket.Conn) {
+	c.connection = conn
+	c.angle = 0.0
+	c.angularVelocity = 0.0
+	c.angularAcceleration = 0.0
+	c.mass = 900.0
+	c.height = 5.0
+	c.width = 3.0
+	c.position = Vector{
+		X: x,
+		Y: y,
+	}
+	c.velocity = Vector{
+		X: 0.0,
+		Y: 0.0,
+	}
+	c.acceleration = Vector{
+		X: 0.0,
+		Y: 0.0,
+	}
+	c.engineForce = Vector{
+		X: 0.1,
+		Y: c.height * 2,
+	}
+	c.forcePoint = Vector{
+		X: 0.0,
+		Y: c.height / 2,
+	}
+	c.momentOfInertia = c.mass * (c.height*c.height + c.width*c.width) / 12
 }
 
 func (c *Car) receiveData() {
@@ -75,7 +116,7 @@ func (c *Car) sendData() {
 	c.connection.WriteJSON(&SentData{
 		X:     c.GetPosition().X,
 		Y:     c.GetPosition().Y,
-		Angle: 0.0,
+		Angle: c.angle,
 	})
 }
 
@@ -86,22 +127,13 @@ type SentData struct {
 	Angle float64 `json:"angle"`
 }
 
+//DoExchange function
 func (c *Car) DoExchange() {
 	c.receiveData()
 	c.sendData()
 }
 
-//SetPosition function
-func (c *Car) SetPosition(position Vector) {
-	c.position = position
-	c.p1 = Vector{X: 2, Y: -3}
-	c.p2 = Vector{X: 2, Y: 3}
-	c.p3 = Vector{X: 2, Y: 3}
-	c.p4 = Vector{X: -2, Y: 3}
-	//c.velocity = Vector{X: 0.0, Y: 0.0}
-	c.angle = 0.0
-}
-
+//GetPosition function
 func (c *Car) GetPosition() Vector {
 	return c.position
 }
@@ -111,34 +143,48 @@ func (c *Car) SetMass(mass float64) {
 	c.mass = mass
 }
 
-func (c *Car) setVelocity(vector Vector) {
-	//c.velocity.X = x
-	//c.velocity.Y = y
-}
-
-//SetApplyingForce function
-func (c *Car) SetApplyingForce(vector Vector) {
-	c.acceleration = Vector{
-		X: vector.X / c.mass,
-		Y: vector.Y / c.mass,
-	}
+//ApplyForce function
+func (c *Car) ApplyForce(force Vector, forcePoint Vector) {
+	//calculate linear acceleration
+	c.acceleration = c.acceleration.Add(Vector{
+		X: force.X / c.mass,
+		Y: force.Y / c.mass,
+	})
+	forceMoment := forcePoint.VectorProduct(force)
+	c.angularAcceleration = forceMoment / c.momentOfInertia
 }
 
 //Integrate function
 func (c *Car) Integrate(duration float64) {
+	c.ApplyForce(c.engineForce, c.forcePoint)
 	c.position = c.position.Add(c.velocity.Scale(duration))
 	c.velocity = c.velocity.Add(c.acceleration.Scale(duration))
-	fmt.Printf("x = %f y = %f\n", c.position.X, c.position.Y)
+	//then integrate angular movement
+	c.angle = c.angle + c.angularVelocity*duration
+	if c.angle > 2*math.Pi {
+		c.angle -= 2 * math.Pi
+	}
+	if c.angle < 2*math.Pi {
+		c.angle += 2 * math.Pi
+	}
+	c.angularVelocity += c.angularAcceleration * duration
+	deltaAngle := c.angularVelocity * duration
+	c.angle += deltaAngle
+	c.RotateCar(deltaAngle)
+	c.acceleration = Vector{
+		X: 0,
+		Y: 0,
+	}
+	c.angularAcceleration = 0.0
+	//fmt.Printf("x = %f y = %f\n", c.position.X, c.position.Y)
 }
 
-//Rotate function
-func (c *Car) Rotate(radians float64) {
-	c.angle += radians
-	//rotate velocity and p1, p2, p3, p4 vectors
-	c.p1 = c.p1.Rotate(radians)
-	c.p2 = c.p2.Rotate(radians)
-	c.p3 = c.p3.Rotate(radians)
-	c.p4 = c.p4.Rotate(radians)
+//RotateCar function
+func (c *Car) RotateCar(radians float64) {
+	sum := c.forcePoint.Add(c.engineForce)
+	rotatedSum := sum.Rotate(radians)
+	c.forcePoint = c.forcePoint.Rotate(radians)
+	c.engineForce = rotatedSum.Subtract(c.forcePoint)
 }
 
 //Vector struct
@@ -173,6 +219,11 @@ func (v *Vector) ComponentProduct(vector Vector) Vector {
 //ScalarProduct function returns value, that represent scalar product both vectors A and B (it can be given by formula Ax*Bx+Ay*By+Az*Bz or |A|*|B|*cos(alfa))
 func (v *Vector) ScalarProduct(vector Vector) float64 {
 	return vector.X*v.X + vector.Y*v.Y
+}
+
+//VectorProduct function returns value, thant represent vector product both vectors A and B (formula Ax*By-Bx*Ay)
+func (v *Vector) VectorProduct(vector Vector) float64 {
+	return v.X*vector.Y - vector.X*v.Y
 }
 
 //Normalize function returns new Vector instance that represents normalized vector, given by formula N = [Ax / length, Ay / length]; where length = sqrt(x^2 + y^2)
