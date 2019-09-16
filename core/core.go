@@ -37,8 +37,6 @@ func (s *Session) Run() {
 	}
 }
 
-var t = 0.0
-
 func (s *Session) computeStep(duration float64) {
 	for _, car := range s.Cars {
 		car.Integrate(duration)
@@ -60,7 +58,8 @@ type Car struct {
 
 	//car parameters
 	engineForce      Vector
-	centrifugalForce Vector
+	engineForceAngle float64
+	forcePoint       Vector
 
 	//angular parameters
 	angle               float64
@@ -80,6 +79,12 @@ type Car struct {
 //Init function
 func (c *Car) Init(x float64, y float64, conn *websocket.Conn) {
 	c.connection = conn
+	c.angle = 0.0
+	c.angularVelocity = 0.0
+	c.angularAcceleration = 0.0
+	c.mass = 900.0
+	c.height = 5.0
+	c.width = 3.0
 	c.position = Vector{
 		X: x,
 		Y: y,
@@ -93,15 +98,13 @@ func (c *Car) Init(x float64, y float64, conn *websocket.Conn) {
 		Y: 0.0,
 	}
 	c.engineForce = Vector{
-		X: 0.0,
-		Y: 5.0,
+		X: 0.1,
+		Y: c.height * 2,
 	}
-	c.angle = 0.0
-	c.angularVelocity = 0.0
-	c.angularAcceleration = 0.0
-	c.mass = 900.0
-	c.height = 5.0
-	c.width = 3.0
+	c.forcePoint = Vector{
+		X: 0.0,
+		Y: c.height / 2,
+	}
 	c.momentOfInertia = c.mass * (c.height*c.height + c.width*c.width) / 12
 }
 
@@ -147,40 +150,13 @@ func (c *Car) ApplyForce(force Vector, forcePoint Vector) {
 		X: force.X / c.mass,
 		Y: force.Y / c.mass,
 	})
-	//then calculate angular acceleration
-	forceMoment := force.VectorProduct(forcePoint)
-	c.angularAcceleration = c.angularAcceleration + forceMoment/c.momentOfInertia
-}
-
-//RotateWheelsToLeft function
-func (c *Car) RotateWheelsToLeft() {
-	c.centrifugalForce = c.centrifugalForce.
-}
-
-//RotateWheelsToRight function
-func (c *Car) RotateWheelsToRight() {
-	const step = 0.01
-}
-
-//Decelerate function
-func (c *Car) Decelerate() {
-	c.engineForce = c.engineForce.Subtract(c.engineForce.Scale(0.1))
-}
-
-//Accelerate function
-func (c *Car) Accelerate() {
-	c.engineForce = c.engineForce.Add(c.engineForce.Scale(0.1))
+	forceMoment := forcePoint.VectorProduct(force)
+	c.angularAcceleration = forceMoment / c.momentOfInertia
 }
 
 //Integrate function
 func (c *Car) Integrate(duration float64) {
-	c.ApplyForce(c.engineForce, Vector{
-		X: 0.0,
-		Y: 0.0,
-	})
-	c.ApplyForce(c.wheelsForce, c.leftWheelPosition)
-	c.ApplyForce(c.wheelsForce, c.rightWheelPosition)
-
+	c.ApplyForce(c.engineForce, c.forcePoint)
 	c.position = c.position.Add(c.velocity.Scale(duration))
 	c.velocity = c.velocity.Add(c.acceleration.Scale(duration))
 	//then integrate angular movement
@@ -191,22 +167,24 @@ func (c *Car) Integrate(duration float64) {
 	if c.angle < 2*math.Pi {
 		c.angle += 2 * math.Pi
 	}
-	c.engineForce = c.engineForce.Rotate(c.angle)
-
-	c.angularVelocity = c.angularVelocity + c.angularAcceleration*duration
-	//fmt.Printf("x = %f y = %f\n", c.position.X, c.position.Y)
-
-	//clean accelerations after integration
+	c.angularVelocity += c.angularAcceleration * duration
+	deltaAngle := c.angularVelocity * duration
+	c.angle += deltaAngle
+	c.RotateCar(deltaAngle)
 	c.acceleration = Vector{
 		X: 0,
 		Y: 0,
 	}
 	c.angularAcceleration = 0.0
+	//fmt.Printf("x = %f y = %f\n", c.position.X, c.position.Y)
 }
 
-//Rotate function
-func (c *Car) Rotate(radians float64) {
-	c.angle += radians
+//RotateCar function
+func (c *Car) RotateCar(radians float64) {
+	sum := c.forcePoint.Add(c.engineForce)
+	rotatedSum := sum.Rotate(radians)
+	c.forcePoint = c.forcePoint.Rotate(radians)
+	c.engineForce = rotatedSum.Subtract(c.forcePoint)
 }
 
 //Vector struct
