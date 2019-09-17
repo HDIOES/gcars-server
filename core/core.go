@@ -31,7 +31,7 @@ func (s *Session) Run() {
 		go func() {
 			for strings.Compare(s.status, "running") == 0 {
 				time.Sleep(20 * time.Millisecond)
-				s.computeStep(1)
+				s.computeStep(0.02)
 			}
 		}()
 	}
@@ -82,9 +82,9 @@ func (c *Car) Init(x float64, y float64, conn *websocket.Conn) {
 	c.angle = 0.0
 	c.angularVelocity = 0.0
 	c.angularAcceleration = 0.0
-	c.mass = 900.0
-	c.height = 5.0
-	c.width = 3.0
+	c.mass = 4500.0
+	c.height = 8.0
+	c.width = 4.0
 	c.position = Vector{
 		X: x,
 		Y: y,
@@ -98,12 +98,12 @@ func (c *Car) Init(x float64, y float64, conn *websocket.Conn) {
 		Y: 0.0,
 	}
 	c.engineForce = Vector{
-		X: 0.1,
-		Y: c.height * 2,
+		X: 1000.0,
+		Y: -100,
 	}
 	c.forcePoint = Vector{
-		X: 0.0,
-		Y: c.height / 2,
+		X: c.width / 2,
+		Y: 0.0,
 	}
 	c.momentOfInertia = c.mass * (c.height*c.height + c.width*c.width) / 12
 }
@@ -114,17 +114,21 @@ func (c *Car) receiveData() {
 
 func (c *Car) sendData() {
 	c.connection.WriteJSON(&SentData{
-		X:     c.GetPosition().X,
-		Y:     c.GetPosition().Y,
-		Angle: c.angle,
+		X:           c.GetPosition().X,
+		Y:           c.GetPosition().Y,
+		Angle:       c.angle,
+		ForcePoint:  c.forcePoint,
+		EngineForce: c.engineForce,
 	})
 }
 
 //SentData struct represents sent data
 type SentData struct {
-	X     float64 `json:"x"`
-	Y     float64 `json:"y"`
-	Angle float64 `json:"angle"`
+	X           float64 `json:"x"`
+	Y           float64 `json:"y"`
+	Angle       float64 `json:"angle"`
+	EngineForce Vector  `json:"engineForce"`
+	ForcePoint  Vector  `json:"forcePoint"`
 }
 
 //DoExchange function
@@ -160,16 +164,15 @@ func (c *Car) Integrate(duration float64) {
 	c.position = c.position.Add(c.velocity.Scale(duration))
 	c.velocity = c.velocity.Add(c.acceleration.Scale(duration))
 	//then integrate angular movement
-	c.angle = c.angle + c.angularVelocity*duration
-	if c.angle > 2*math.Pi {
-		c.angle -= 2 * math.Pi
-	}
-	if c.angle < 2*math.Pi {
-		c.angle += 2 * math.Pi
-	}
-	c.angularVelocity += c.angularAcceleration * duration
+	c.angularVelocity = c.angularVelocity + c.angularAcceleration*duration
 	deltaAngle := c.angularVelocity * duration
-	c.angle += deltaAngle
+	c.angle = c.angle + deltaAngle
+	if c.angle > 2*math.Pi {
+		c.angle = c.angle - 2*math.Pi
+	}
+	if c.angle < -2*math.Pi {
+		c.angle = c.angle + 2*math.Pi
+	}
 	c.RotateCar(deltaAngle)
 	c.acceleration = Vector{
 		X: 0,
@@ -189,15 +192,21 @@ func (c *Car) RotateCar(radians float64) {
 
 //Vector struct
 type Vector struct {
-	X float64
-	Y float64
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
 }
 
 //Rotate function initializes new Vector instance, that represents rotated variant of origin vector by radians
 func (v *Vector) Rotate(radians float64) Vector {
+	if radians > 0 {
+		return Vector{
+			X: math.Cos(radians)*v.X + math.Sin(radians)*v.Y,
+			Y: -math.Sin(radians)*v.X + math.Cos(radians)*v.Y,
+		}
+	}
 	return Vector{
-		X: math.Cos(radians)*v.X + math.Sin(radians)*v.Y,
-		Y: -math.Sin(radians)*v.X + math.Cos(radians)*v.Y,
+		X: math.Cos(radians)*v.X - math.Sin(radians)*v.Y,
+		Y: math.Sin(radians)*v.X + math.Cos(radians)*v.Y,
 	}
 }
 
