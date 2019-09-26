@@ -1,6 +1,7 @@
 package core
 
 import (
+	"log"
 	"math"
 	"strings"
 	"time"
@@ -39,8 +40,23 @@ func (s *Session) Run() {
 
 func (s *Session) computeStep(duration float64) {
 	for _, car := range s.Cars {
+		select {
+		case signal := <-car.Signal:
+			log.Println(signal)
+			//apply signal from XBox or PlayStation controller
+		default:
+		}
 		car.Integrate(duration)
-		car.DoExchange()
+		sendData := SentData{
+			X:           car.GetPosition().X,
+			Y:           car.GetPosition().Y,
+			Angle:       car.angle,
+			ForcePoint:  car.forcePoint,
+			EngineForce: car.engineForce,
+		}
+		if len(car.Output) == 0 {
+			car.Output <- sendData
+		}
 	}
 }
 
@@ -74,6 +90,8 @@ type Car struct {
 
 	//tech parameters
 	connection *websocket.Conn
+	Signal     chan SignalData
+	Output     chan SentData
 }
 
 //Init function
@@ -82,7 +100,7 @@ func (c *Car) Init(x float64, y float64, conn *websocket.Conn) {
 	c.angle = 0.0
 	c.angularVelocity = 0.0
 	c.angularAcceleration = 0.0
-	c.mass = 4500.0
+	c.mass = 500.0
 	c.height = 8.0
 	c.width = 4.0
 	c.position = Vector{
@@ -90,7 +108,7 @@ func (c *Car) Init(x float64, y float64, conn *websocket.Conn) {
 		Y: y,
 	}
 	c.velocity = Vector{
-		X: 0.0,
+		X: 20.0,
 		Y: 0.0,
 	}
 	c.acceleration = Vector{
@@ -98,28 +116,33 @@ func (c *Car) Init(x float64, y float64, conn *websocket.Conn) {
 		Y: 0.0,
 	}
 	c.engineForce = Vector{
-		X: 1000.0,
-		Y: -100,
+		X: 0.0,
+		Y: 10000.0,
 	}
 	c.forcePoint = Vector{
-		X: c.width / 2,
-		Y: 0.0,
+		X: 0.0,
+		Y: -c.width / 2,
 	}
 	c.momentOfInertia = c.mass * (c.height*c.height + c.width*c.width) / 12
+	c.Signal = make(chan SignalData, 1)
+	c.Output = make(chan SentData, 1)
+	go c.DoExchange()
 }
 
-func (c *Car) receiveData() {
-
-}
-
-func (c *Car) sendData() {
-	c.connection.WriteJSON(&SentData{
-		X:           c.GetPosition().X,
-		Y:           c.GetPosition().Y,
-		Angle:       c.angle,
-		ForcePoint:  c.forcePoint,
-		EngineForce: c.engineForce,
-	})
+//DoExchange function
+func (c *Car) DoExchange() {
+	var signal *SignalData
+	for {
+		if len(c.Signal) == 0 {
+			c.connection.ReadJSON(&signal)
+			c.Signal <- *signal
+		}
+		select {
+		case out := <-c.Output:
+			c.connection.WriteJSON(out)
+		default:
+		}
+	}
 }
 
 //SentData struct represents sent data
@@ -131,10 +154,9 @@ type SentData struct {
 	ForcePoint  Vector  `json:"forcePoint"`
 }
 
-//DoExchange function
-func (c *Car) DoExchange() {
-	c.receiveData()
-	c.sendData()
+//SignalData struct
+type SignalData struct {
+	Angle float64 `json:"angle"`
 }
 
 //GetPosition function
@@ -184,10 +206,10 @@ func (c *Car) Integrate(duration float64) {
 
 //RotateCar function
 func (c *Car) RotateCar(radians float64) {
-	sum := c.forcePoint.Add(c.engineForce)
-	rotatedSum := sum.Rotate(radians)
+	s := c.forcePoint.Subtract(c.engineForce)
+	rotatedS := s.Rotate(radians)
 	c.forcePoint = c.forcePoint.Rotate(radians)
-	c.engineForce = rotatedSum.Subtract(c.forcePoint)
+	c.engineForce = c.forcePoint.Subtract(rotatedS)
 }
 
 //Vector struct

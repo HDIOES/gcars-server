@@ -30,11 +30,11 @@ func main() {
 			return true
 		}
 		conn, err := upgrader.Upgrade(w, r, nil)
-		session.AddCar(2000, 5000, conn)
 		if err != nil {
 			conn.Close()
 			return
 		}
+		session.AddCar(2000, 5000, conn)
 		log.Println("Connection added")
 	})
 
