@@ -1,7 +1,6 @@
 package core
 
 import (
-	"log"
 	"math"
 	"strings"
 	"time"
@@ -41,9 +40,12 @@ func (s *Session) Run() {
 func (s *Session) computeStep(duration float64) {
 	for _, car := range s.Cars {
 		select {
-		case signal := <-car.Signal:
-			log.Println(signal)
+		case input := <-car.Input:
+			//log.Println(input.Angle)
+			car.engineForce.X = math.Cos(input.Angle) * 1000
+			car.engineForce.Y = math.Sin(input.Angle) * 1000
 			//apply signal from XBox or PlayStation controller
+
 		default:
 		}
 		car.Integrate(duration)
@@ -90,7 +92,7 @@ type Car struct {
 
 	//tech parameters
 	connection *websocket.Conn
-	Signal     chan SignalData
+	Input      chan SignalData
 	Output     chan SentData
 }
 
@@ -108,7 +110,7 @@ func (c *Car) Init(x float64, y float64, conn *websocket.Conn) {
 		Y: y,
 	}
 	c.velocity = Vector{
-		X: 20.0,
+		X: 0.0,
 		Y: 0.0,
 	}
 	c.acceleration = Vector{
@@ -117,31 +119,33 @@ func (c *Car) Init(x float64, y float64, conn *websocket.Conn) {
 	}
 	c.engineForce = Vector{
 		X: 0.0,
-		Y: 10000.0,
+		Y: 0.0,
 	}
 	c.forcePoint = Vector{
-		X: 0.0,
-		Y: -c.width / 2,
+		X: c.height / 2,
+		Y: 0.0,
 	}
 	c.momentOfInertia = c.mass * (c.height*c.height + c.width*c.width) / 12
-	c.Signal = make(chan SignalData, 1)
+	c.Input = make(chan SignalData, 1)
 	c.Output = make(chan SentData, 1)
-	go c.DoExchange()
+	go c.readLoop()
+	go c.writeLoop()
 }
 
-//DoExchange function
-func (c *Car) DoExchange() {
+//writeLoop function
+func (c *Car) writeLoop() {
+	for {
+		out := <-c.Output
+		c.connection.WriteJSON(out)
+	}
+}
+
+//readLoop
+func (c *Car) readLoop() {
 	var signal *SignalData
 	for {
-		if len(c.Signal) == 0 {
-			c.connection.ReadJSON(&signal)
-			c.Signal <- *signal
-		}
-		select {
-		case out := <-c.Output:
-			c.connection.WriteJSON(out)
-		default:
-		}
+		c.connection.ReadJSON(&signal)
+		c.Input <- *signal
 	}
 }
 
